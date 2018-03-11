@@ -51,7 +51,13 @@ struct reg_t {
         };
         uint16_t SP;
     };
-    uint16_t PC;
+    union {
+        struct {
+            uint8_t PCL;
+            uint8_t PCH;
+        };
+        uint16_t PC;
+    };
 };
 
 void printRegisters();

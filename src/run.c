@@ -63,11 +63,77 @@ void flags(uint8_t v) {
     R0 = R1; \
     ++_R.PC
 
+#define ADD(R) \
+    _R.A += R; \
+    flags(_R.A); \
+    ++_R.PC
+
+#define ADC(R) \
+    _R.A = R + _R.CY; \
+    flags(_R.A); \
+    ++_R.PC
+
+#define SUB(R) \
+    _R.A -= R; \
+    flags(_R.A); \
+    ++_R.PC
+
+#define SBB(R) \
+    _R.A = R - _R.CY; \
+    flags(_R.A); \
+    ++_R.PC
+
+#define ANA(R) \
+    _R.A &= R; \
+    flags(_R.A); \
+    ++_R.PC
+
+#define XRA(R) \
+    _R.A ^= R; \
+    flags(_R.A); \
+    ++_R.PC
+
+#define ORA(R) \
+    _R.A |= R; \
+    flags(_R.A); \
+    ++_R.PC
+
+#define CMP(R) \
+    _R.A -= R; \
+    flags(_R.A); \
+    ++_R.PC
+
+#define PUSH(R0, R1) \
+    program[_R.SP - 2] = R0; \
+    program[_R.SP - 1] = R1; \
+    _R.SP -= 2; \
+    ++_R.PC;
+
+#define POP(R0, R1) \
+    R0 = program[_R.SP + 1]; \
+    R1 = program[_R.SP]; \
+    _R.SP += 2; \
+    ++_R.PC;
+
+#define JMP() \
+    _R.PC = (program[_R.PC + 2] << 8) | program[_R.PC + 1]
+
+#define CALL() \
+    program[_R.SP - 1] = (_R.PC & 0xFF00) >> 8; \
+    program[_R.SP - 2] = (_R.PC & 0x00FF); \
+    _R.SP += 2; \
+    _R.PC = (program[_R.PC + 2] << 8) | program[_R.PC + 1]
+
+#define RET() \
+    _R.PCL = program[_R.SP]; \
+    _R.PCH = program[_R.SP + 1]; \
+    _R.SP += 2
+
 void run(uint8_t * program, long programSize)
 {
     while (_R.PC < programSize) {
-        disasmInst(program, _R.PC);
         printRegisters();
+        disasmInst(program, _R.PC);
         getc(stdin);
 
         switch (program[_R.PC]) {
@@ -109,8 +175,10 @@ void run(uint8_t * program, long programSize)
         case 0x15: DCR(_R.D); break;
         case 0x16: MVI(program, _R.D); break;
 
-        // RAR
+        // RAL
         case 0x17:
+            _R.CY = (_R.A & 0x01);
+            _R.A = (_R.A >> 1) | (_R.CY << 7);
             ++_R.PC;
             break;
 
@@ -121,7 +189,7 @@ void run(uint8_t * program, long programSize)
         case 0x1D: DCR(_R.E); break;
         case 0x1E: MVI(program, _R.E); break;
 
-        // RIM
+        // RAR
         case 0x1F:
             ++_R.PC;
             break;
@@ -149,7 +217,7 @@ void run(uint8_t * program, long programSize)
 
         // STA
         case 0x32:
-            program[(program[_R.PC + 1] << 8) | program[_R.PC + 2]] = _R.A;
+            program[(program[_R.PC + 2] << 8) | program[_R.PC + 1]] = _R.A;
             ++_R.PC;
             break;
 
@@ -168,7 +236,7 @@ void run(uint8_t * program, long programSize)
 
         // LDA
         case 0x3A:
-            _R.A = program[(program[_R.PC + 1] << 8) | program[_R.PC + 2]];
+            _R.A = program[(program[_R.PC + 2] << 8) | program[_R.PC + 1]];
             ++_R.PC;
             break;
 
@@ -247,24 +315,121 @@ void run(uint8_t * program, long programSize)
         case 0x7e: MOV(_R.A, program[_R.HL]); break;
         case 0x7f: MOV(_R.A, _R.A); break;
 
+        case 0x80: ADD(_R.B); break;
+        case 0x81: ADD(_R.C); break;
+        case 0x82: ADD(_R.D); break;
+        case 0x83: ADD(_R.E); break;
+        case 0x84: ADD(_R.H); break;
+        case 0x85: ADD(_R.L); break;
+        case 0x86: ADD(program[_R.HL]); break;
+        case 0x87: ADD(_R.A); break;
+        case 0x88: ADC(_R.B); break;
+        case 0x89: ADC(_R.C); break;
+        case 0x8A: ADC(_R.D); break;
+        case 0x8B: ADC(_R.E); break;
+        case 0x8C: ADC(_R.H); break;
+        case 0x8D: ADC(_R.L); break;
+        case 0x8E: ADC(program[_R.HL]); break;
+        case 0x8F: ADC(_R.A); break;
+        case 0x90: SUB(_R.B); break;
+        case 0x91: SUB(_R.C); break;
+        case 0x92: SUB(_R.D); break;
+        case 0x93: SUB(_R.E); break;
+        case 0x94: SUB(_R.H); break;
+        case 0x95: SUB(_R.L); break;
+        case 0x96: SUB(program[_R.HL]); break;
+        case 0x97: SUB(_R.A); break;
+        case 0x98: SBB(_R.B); break;
+        case 0x99: SBB(_R.C); break;
+        case 0x9A: SBB(_R.D); break;
+        case 0x9B: SBB(_R.E); break;
+        case 0x9C: SBB(_R.H); break;
+        case 0x9D: SBB(_R.L); break;
+        case 0x9E: SBB(program[_R.HL]); break;
+        case 0x9F: SBB(_R.A); break;
+        case 0xA0: ANA(_R.B); break;
+        case 0xA1: ANA(_R.C); break;
+        case 0xA2: ANA(_R.D); break;
+        case 0xA3: ANA(_R.E); break;
+        case 0xA4: ANA(_R.H); break;
+        case 0xA5: ANA(_R.L); break;
+        case 0xA6: ANA(program[_R.HL]); break;
+        case 0xA7: ANA(_R.A); break;
+        case 0xA8: XRA(_R.B); break;
+        case 0xA9: XRA(_R.C); break;
+        case 0xAA: XRA(_R.D); break;
+        case 0xAB: XRA(_R.E); break;
+        case 0xAC: XRA(_R.H); break;
+        case 0xAD: XRA(_R.L); break;
+        case 0xAE: XRA(program[_R.HL]); break;
+        case 0xAF: XRA(_R.A); break;
+        case 0xB0: ORA(_R.B); break;
+        case 0xB1: ORA(_R.C); break;
+        case 0xB2: ORA(_R.D); break;
+        case 0xB3: ORA(_R.E); break;
+        case 0xB4: ORA(_R.H); break;
+        case 0xB5: ORA(_R.L); break;
+        case 0xB6: ORA(program[_R.HL]); break;
+        case 0xB7: ORA(_R.A); break;
+        case 0xB8: CMP(_R.B); break;
+        case 0xB9: CMP(_R.C); break;
+        case 0xBA: CMP(_R.D); break;
+        case 0xBB: CMP(_R.E); break;
+        case 0xBC: CMP(_R.H); break;
+        case 0xBD: CMP(_R.L); break;
+        case 0xBE: CMP(program[_R.HL]); break;
+        case 0xBF: CMP(_R.A); break;
 
-        // CALL
-        case 0xCD:
-            program[_R.SP - 1] = (_R.PC & 0xFF00) >> 8;
-            program[_R.SP - 2] = (_R.PC & 0x00FF);
-            _R.SP += 2;
-            _R.PC = (program[_R.PC + 1] << 8) | program[_R.PC + 2];
-            break;
+        // RNZ
+        case 0xC0:
+            if (!_R.Z) RET(); break;
+
+        case 0xC1: POP(_R.B, _R.C); break;
+
+        // JNZ
+        case 0xC2:
+            if (!_R.Z) JMP(); break;
 
         // JMP
-        case 0xC3:
-            _R.PC = (program[_R.PC + 1] << 8) | program[_R.PC + 2];
+        case 0xC3: JMP(); break;
+
+        // CNZ
+        case 0xC4:
+            if (!_R.Z) CALL(); break;
+
+        case 0xC5: PUSH(_R.B, _R.C); break;
+
+        // ADI
+        case 0xC6:
+            _R.A += program[_R.PC + 1];
+            _R.PC += 2;
             break;
+
+        // RST 0
+        case 0xC7:
+            break;
+
+        // RZ
+        case 0xC8:
+            if (_R.Z) RET(); break;
+
+        // RET
+        case 0xC9: RET(); break;
+
+        // JZ
+        case 0xCA:
+            if (_R.Z) JMP(); break;
+
+        // CZ
+        case 0xCC:
+            if (_R.Z) CALL(); break;
+
+        // CALL
+        case 0xCD: CALL(); break;
 
         // JPE
         case 0xEA:
-            _R.PC = (_R.P ? _R.PC + 1 : (program[_R.PC + 1] << 8) | program[_R.PC + 2]);
-            break;
+            if (!_R.P) JMP(); break;
 
         default:
             ++_R.PC;
